@@ -118,7 +118,7 @@ export default function AccessPage() {
         <a href="/" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-white/75 transition hover:text-white">
           <ArrowLeft size={16} /> Voltar ao início
         </a>
-        <section className="rounded-[2rem] border border-white/20 bg-[#fffdf7] p-7 shadow-2xl sm:p-9">
+        <section className="rounded-4xl border border-white/20 bg-[#fffdf7] p-7 shadow-2xl sm:p-9">
           <div className="mb-7 flex size-12 items-center justify-center rounded-2xl bg-[#dff1ed] text-[#0a7088]">
             {mode === 'register' ? <Sparkles size={23} /> : mode === 'forgot' ? <KeyRound size={22} /> : <LockKeyhole size={22} />}
           </div>

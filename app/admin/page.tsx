@@ -141,7 +141,7 @@ export default function PlatformAdminPage() {
 
 function SummaryCard({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   return (
-    <article className="flex items-center gap-4 rounded-[1.5rem] border border-white/80 bg-[#fffdf7] p-6 shadow-[0_12px_35px_rgba(6,59,91,.06)]">
+    <article className="flex items-center gap-4 rounded-3xl border border-white/80 bg-[#fffdf7] p-6 shadow-[0_12px_35px_rgba(6,59,91,.06)]">
       <div className="flex size-12 items-center justify-center rounded-2xl bg-[#dff1ed] text-[#0a7088]">{icon}</div>
       <div><strong className="font-display text-4xl leading-none text-[#073f53]">{value}</strong><p className="mt-1 text-sm text-[#617f87]">{label}</p></div>
     </article>

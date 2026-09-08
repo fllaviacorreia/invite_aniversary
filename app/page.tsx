@@ -324,7 +324,7 @@ export default function Page() {
       <section id="inicio" className="hero-section">
         <img src={config.backgroundImage || heroImage} alt={`${config.childName} em um cenário de fundo do mar`} className="absolute inset-0 size-full object-cover object-center" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,45,65,.42)_0%,rgba(5,45,65,.04)_42%,rgba(5,45,65,.88)_100%)]" />
-        <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-[#edf7f3] to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-28 bg-linear-to-t from-[#edf7f3] to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-20 sm:pb-24">
           <div className="max-w-2xl text-white drop-shadow-md">
             <p className="eyebrow text-[#ffd36a]">Uma aventura está chegando · {config.age} anos</p>
@@ -649,9 +649,9 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
           </AdminSection>
 
           <AdminSection title="Imagem de fundo">
-            <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-[#d8eeea]">
+            <div className="relative aspect-16/10 overflow-hidden rounded-2xl bg-[#d8eeea]">
               <img src={draft.backgroundImage || heroImage} alt="Prévia da imagem de fundo" className="size-full object-cover" />
-              <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-[#052f40]/75 to-transparent px-4 pb-3 pt-8 text-xs font-bold text-white"><ImageIcon size={15} /> Prévia da capa</div>
+              <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-linear-to-t from-[#052f40]/75 to-transparent px-4 pb-3 pt-8 text-xs font-bold text-white"><ImageIcon size={15} /> Prévia da capa</div>
             </div>
             <AdminField label="Usar uma imagem da internet">
               <input
@@ -770,8 +770,8 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
 
 function ModalShell({ children, onClose, side }: { children: ReactNode; onClose: () => void; side: boolean }) {
   return (
-    <div className={`fixed inset-0 z-[70] flex bg-[#052f40]/55 backdrop-blur-sm ${side ? 'justify-end' : 'items-end justify-center sm:items-center sm:p-6'}`} role="dialog" aria-modal="true">
-      <div className={side ? 'h-full w-full max-w-xl overflow-y-auto bg-[#fffdf7] p-7 shadow-2xl sm:p-10' : 'max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[2rem] bg-[#fffdf7] p-7 shadow-2xl sm:rounded-[2rem] sm:p-9'}>
+    <div className={`fixed inset-0 z-70 flex bg-[#052f40]/55 backdrop-blur-sm ${side ? 'justify-end' : 'items-end justify-center sm:items-center sm:p-6'}`} role="dialog" aria-modal="true">
+      <div className={side ? 'h-full w-full max-w-xl overflow-y-auto bg-[#fffdf7] p-7 shadow-2xl sm:p-10' : 'max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-4xl bg-[#fffdf7] p-7 shadow-2xl sm:rounded-4xl sm:p-9'}>
         {children}
       </div>
     </div>
