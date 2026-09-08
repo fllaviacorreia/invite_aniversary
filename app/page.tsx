@@ -1,10 +1,13 @@
 'use client'
 
 import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react'
+import { useParams } from 'next/navigation'
 import {
   CalendarDays,
   Check,
   ChevronDown,
+  Copy,
+  ExternalLink,
   Fish,
   Gift,
   Heart,
@@ -19,7 +22,7 @@ import {
   PencilLine,
   RotateCcw,
   Send,
-  ShieldCheck,
+  Share2,
   Shell,
   Sparkles,
   Trash2,
@@ -28,10 +31,11 @@ import {
   Waves,
   X,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase-client'
 
 const heroImage = '/hero-ocean.png'
 
-type InvitationConfig = {
+export type InvitationConfig = {
   childName: string
   age: string
   headline: string
@@ -49,7 +53,7 @@ type InvitationConfig = {
   familySignature: string
 }
 
-type Rsvp = {
+export type Rsvp = {
   id: string
   name: string
   attendance: 'yes' | 'no'
@@ -58,7 +62,25 @@ type Rsvp = {
   createdAt: string
 }
 
-const defaultConfig: InvitationConfig = {
+export type InvitationRow = {
+  child_name: string
+  age: string
+  headline: string
+  introduction: string
+  event_date: string
+  event_time: string
+  venue: string
+  address: string
+  attire: string
+  attire_note: string
+  max_guests: number
+  soundtrack_url: string
+  background_image: string
+  gift_names: string[]
+  family_signature: string
+}
+
+export const defaultConfig: InvitationConfig = {
   childName: 'Theo',
   age: '5',
   headline: 'mergulha em uma nova idade!',
@@ -82,38 +104,84 @@ const giftDetails = [
   'Uma aventura para montar em família',
 ]
 
-function usePersistedInvitation() {
+export function rowToConfig(row: InvitationRow): InvitationConfig {
+  return {
+    childName: row.child_name,
+    age: row.age,
+    headline: row.headline,
+    introduction: row.introduction,
+    date: row.event_date,
+    time: row.event_time,
+    venue: row.venue,
+    address: row.address,
+    attire: row.attire,
+    attireNote: row.attire_note,
+    maxGuests: row.max_guests,
+    soundtrackUrl: row.soundtrack_url,
+    backgroundImage: row.background_image,
+    giftNames: row.gift_names,
+    familySignature: row.family_signature,
+  }
+}
+
+export function configToRow(config: InvitationConfig): InvitationRow {
+  return {
+    child_name: config.childName,
+    age: config.age,
+    headline: config.headline,
+    introduction: config.introduction,
+    event_date: config.date,
+    event_time: config.time,
+    venue: config.venue,
+    address: config.address,
+    attire: config.attire,
+    attire_note: config.attireNote,
+    max_guests: config.maxGuests,
+    soundtrack_url: config.soundtrackUrl,
+    background_image: config.backgroundImage,
+    gift_names: config.giftNames,
+    family_signature: config.familySignature,
+  }
+}
+
+function useSupabaseInvitation(slug?: string) {
   const [config, setConfig] = useState(defaultConfig)
   const [rsvps, setRsvps] = useState<Rsvp[]>([])
-  const [ready, setReady] = useState(false)
+  const [invitationId, setInvitationId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(Boolean(slug))
+  const [found, setFound] = useState(true)
 
   useEffect(() => {
-    try {
-      const savedConfig = localStorage.getItem('theo-invitation-config')
-      const savedRsvps = localStorage.getItem('theo-invitation-rsvps')
-      if (savedConfig) setConfig({ ...defaultConfig, ...JSON.parse(savedConfig) })
-      if (savedRsvps) setRsvps(JSON.parse(savedRsvps))
-    } catch {
-      // If the stored preview is malformed, the invitation still opens with safe defaults.
-    } finally {
-      setReady(true)
+    let active = true
+    const loadInvitation = async () => {
+      if (!slug) {
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      const baseQuery = supabase
+        .from('invitations')
+        .select('id, slug, child_name, age, headline, introduction, event_date, event_time, venue, address, attire, attire_note, max_guests, soundtrack_url, background_image, gift_names, family_signature')
+        .eq('published', true)
+      const { data, error } = await baseQuery.eq('slug', slug).maybeSingle()
+
+      if (!active) return
+      if (!error && data) {
+        setInvitationId(String(data.id))
+        setConfig(rowToConfig(data as InvitationRow))
+        setFound(true)
+      } else {
+        setInvitationId(null)
+        setFound(false)
+      }
+      setLoading(false)
     }
-  }, [])
 
-  useEffect(() => {
-    if (!ready) return
-    try {
-      localStorage.setItem('theo-invitation-config', JSON.stringify(config))
-    } catch {
-      // Keep the current preview even if this browser has no storage space left.
-    }
-  }, [config, ready])
+    void loadInvitation()
+    return () => { active = false }
+  }, [slug])
 
-  useEffect(() => {
-    if (ready) localStorage.setItem('theo-invitation-rsvps', JSON.stringify(rsvps))
-  }, [rsvps, ready])
-
-  return { config, setConfig, rsvps, setRsvps }
+  return { config, setConfig, rsvps, setRsvps, invitationId, loading, found }
 }
 
 function useSoundtrack(source: string) {
@@ -207,13 +275,12 @@ function useSoundtrack(source: string) {
 }
 
 export default function Page() {
-  const { config, setConfig, rsvps, setRsvps } = usePersistedInvitation()
+  const params = useParams<{ slug?: string }>()
+  const slug = typeof params?.slug === 'string' ? params.slug : undefined
+  const { config, invitationId, loading, found } = useSupabaseInvitation(slug)
   const { isPlaying, play, toggle } = useSoundtrack(config.soundtrackUrl)
   const [entered, setEntered] = useState(false)
   const [rsvpOpen, setRsvpOpen] = useState(false)
-  const [adminOpen, setAdminOpen] = useState(false)
-  const [adminLoginOpen, setAdminLoginOpen] = useState(false)
-  const [adminChecking, setAdminChecking] = useState(false)
   const [reserved, setReserved] = useState<string[]>([])
 
   const enterInvitation = () => {
@@ -221,30 +288,21 @@ export default function Page() {
     setEntered(true)
   }
 
-  const addRsvp = (rsvp: Omit<Rsvp, 'id' | 'createdAt'>) => {
-    setRsvps((current) => [
-      { ...rsvp, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
-      ...current,
-    ])
+  const addRsvp = async (rsvp: Omit<Rsvp, 'id' | 'createdAt'>) => {
+    if (!invitationId) throw new Error('Convite não encontrado.')
+    const { error } = await supabase.from('rsvps').insert({
+      invitation_id: invitationId,
+      name: rsvp.name.trim(),
+      attendance: rsvp.attendance,
+      guests: rsvp.guests,
+      message: rsvp.message.trim(),
+    })
+    if (error) throw new Error(error.message)
   }
 
-  const requestAdminAccess = async () => {
-    setAdminChecking(true)
-    try {
-      const response = await fetch('/api/admin/session', { cache: 'no-store' })
-      if (response.ok) setAdminOpen(true)
-      else setAdminLoginOpen(true)
-    } catch {
-      setAdminLoginOpen(true)
-    } finally {
-      setAdminChecking(false)
-    }
-  }
-
-  const logoutAdmin = async () => {
-    await fetch('/api/admin/logout', { method: 'POST' })
-    setAdminOpen(false)
-  }
+  if (!slug) return <PlatformLanding />
+  if (loading) return <InvitationMessage loading text="Preparando o convite..." />
+  if (!found) return <InvitationMessage text="Este convite não existe ou ainda não está publicado." />
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#edf7f3] text-[#123f4d]">
@@ -330,31 +388,51 @@ export default function Page() {
         <Shell className="mx-auto mb-4 text-[#1386a5]" size={28} />
         <p className="font-display text-2xl text-[#073f53]">Esperamos você, <i>mergulhador!</i></p>
         <p className="mt-3 text-sm text-[#547884]">{config.familySignature}</p>
-        <button disabled={adminChecking} onClick={requestAdminAccess} className="mt-9 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-[#547884] underline underline-offset-4 disabled:cursor-wait disabled:opacity-60">
-          {adminChecking ? <LoaderCircle className="animate-spin" size={14} /> : <LockKeyhole size={14} />} Acesso administrativo
-        </button>
+        <a href="/acesso" className="mt-9 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-[#547884] underline underline-offset-4">
+          <LockKeyhole size={14} /> Gerenciar meu convite
+        </a>
       </footer>
 
       {rsvpOpen && <RSVPModal config={config} onClose={() => setRsvpOpen(false)} onSubmit={addRsvp} />}
-      {adminLoginOpen && (
-        <AdminLoginModal
-          onClose={() => setAdminLoginOpen(false)}
-          onAuthenticated={() => {
-            setAdminLoginOpen(false)
-            setAdminOpen(true)
-          }}
-        />
-      )}
-      {adminOpen && (
-        <AdminPanel
-          config={config}
-          rsvps={rsvps}
-          onSave={setConfig}
-          onDeleteRsvp={(id) => setRsvps((items) => items.filter((item) => item.id !== id))}
-          onLogout={logoutAdmin}
-          onClose={() => setAdminOpen(false)}
-        />
-      )}
+    </main>
+  )
+}
+
+function PlatformLanding() {
+  return (
+    <main className="relative flex min-h-screen items-center overflow-hidden bg-[#073f53] px-6 py-16 text-white">
+      <img src={heroImage} alt="Festa infantil com tema fundo do mar" className="absolute inset-0 size-full object-cover object-center opacity-55" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,42,59,.96)_0%,rgba(4,42,59,.82)_48%,rgba(4,42,59,.3)_100%)]" />
+      <div className="bubble bubble-one" /><div className="bubble bubble-two" /><div className="bubble bubble-three" />
+      <div className="relative z-10 mx-auto w-full max-w-6xl">
+        <div className="max-w-xl">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[.18em] backdrop-blur"><Shell size={17} /> Convites especiais</div>
+          <p className="eyebrow text-[#ffd36a]">Sua celebração começa aqui</p>
+          <h1 className="mt-4 font-display text-6xl leading-[.95] tracking-tight sm:text-7xl">Um convite tão <i>único</i> quanto esse momento.</h1>
+          <p className="mt-6 max-w-lg text-base leading-relaxed text-white/78">Crie, personalize e compartilhe seu convite digital. As confirmações chegam organizadas em um painel feito para você.</p>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <a href="/acesso?modo=cadastro" className="primary-button px-8 py-4 text-base"><Sparkles size={18} /> Criar meu convite</a>
+            <a href="/acesso" className="secondary-button px-8 py-4 text-base"><LockKeyhole size={17} /> Já tenho uma conta</a>
+          </div>
+          <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-white/65">
+            <span className="flex items-center gap-2"><Check size={15} className="text-[#ffd36a]" /> Personalização simples</span>
+            <span className="flex items-center gap-2"><Check size={15} className="text-[#ffd36a]" /> Link para compartilhar</span>
+            <span className="flex items-center gap-2"><Check size={15} className="text-[#ffd36a]" /> Lista de convidados</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+
+function InvitationMessage({ text, loading = false }: { text: string; loading?: boolean }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#073f53] px-6 text-center text-white">
+      <div>
+        {loading ? <LoaderCircle className="mx-auto mb-4 animate-spin text-[#ffd36a]" size={30} /> : <Shell className="mx-auto mb-4 text-[#ffd36a]" size={30} />}
+        <p className="max-w-md text-sm leading-relaxed text-white/80">{text}</p>
+        {!loading && <a href="/" className="primary-button mt-6">Voltar ao início</a>}
+      </div>
     </main>
   )
 }
@@ -380,20 +458,30 @@ function AccessCover({ config, onEnter }: { config: InvitationConfig; onEnter: (
   )
 }
 
-function RSVPModal({ config, onClose, onSubmit }: { config: InvitationConfig; onClose: () => void; onSubmit: (rsvp: Omit<Rsvp, 'id' | 'createdAt'>) => void }) {
+function RSVPModal({ config, onClose, onSubmit }: { config: InvitationConfig; onClose: () => void; onSubmit: (rsvp: Omit<Rsvp, 'id' | 'createdAt'>) => Promise<void> }) {
   const [sent, setSent] = useState(false)
   const [attendance, setAttendance] = useState<'yes' | 'no'>('yes')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setSubmitting(true)
+    setError('')
     const data = new FormData(event.currentTarget)
-    onSubmit({
-      name: String(data.get('name') ?? ''),
-      attendance,
-      guests: attendance === 'yes' ? Number(data.get('guests')) : 0,
-      message: String(data.get('message') ?? ''),
-    })
-    setSent(true)
+    try {
+      await onSubmit({
+        name: String(data.get('name') ?? ''),
+        attendance,
+        guests: attendance === 'yes' ? Number(data.get('guests')) : 0,
+        message: String(data.get('message') ?? ''),
+      })
+      setSent(true)
+    } catch {
+      setError('Não foi possível enviar sua resposta. Tente novamente em instantes.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -427,75 +515,15 @@ function RSVPModal({ config, onClose, onSubmit }: { config: InvitationConfig; on
               <span className="field-hint">Inclua você e os acompanhantes.</span>
             </label>
           )}
-          <label className="field-label">Recadinho <span className="font-normal text-[#79949c]">(opcional)</span><textarea name="message" placeholder={`Deixe uma mensagem para ${config.childName}`} className="field-input min-h-24 resize-none" /></label>
-          <button className="primary-button mt-1 w-full" type="submit"><Send size={17} /> Enviar resposta</button>
+          <label className="field-label">Recadinho <span className="font-normal text-[#79949c]">(opcional)</span><textarea name="message" maxLength={500} placeholder={`Deixe uma mensagem para ${config.childName}`} className="field-input min-h-24 resize-none" /></label>
+          {error && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-medium text-[#9b4037]">{error}</p>}
+          <button disabled={submitting} className="primary-button mt-1 w-full disabled:cursor-wait disabled:opacity-70" type="submit">
+            {submitting ? <><LoaderCircle className="animate-spin" size={17} /> Enviando...</> : <><Send size={17} /> Enviar resposta</>}
+          </button>
         </form>
       )}
     </ModalShell>
   )
-}
-
-function AdminLoginModal({ onClose, onAuthenticated }: { onClose: () => void; onAuthenticated: () => void }) {
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setSubmitting(true)
-    setError('')
-    const formData = new FormData(event.currentTarget)
-
-    try {
-      const response = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: String(formData.get('password') ?? '') }),
-      })
-      const result = await response.json() as { error?: string }
-      if (!response.ok) {
-        setError(result.error ?? 'Não foi possível entrar.')
-        return
-      }
-      onAuthenticated()
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <ModalShell onClose={onClose} side={false}>
-      <div className="mb-7 flex items-start justify-between gap-4">
-        <div>
-          <div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#dff1ed] text-[#0a7088]"><LockKeyhole size={22} /></div>
-          <p className="eyebrow text-[#178ba4]">Acesso restrito</p>
-          <h2 className="mt-2 font-display text-3xl text-[#073f53]">Área administrativa</h2>
-          <p className="mt-3 text-sm leading-relaxed text-[#617f87]">Entre com a senha do responsável para editar o convite e consultar as confirmações.</p>
-        </div>
-        <CloseButton onClick={onClose} />
-      </div>
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <label className="field-label">Senha administrativa
-          <input name="password" type="password" autoComplete="current-password" required autoFocus placeholder="Digite sua senha" className="field-input" />
-        </label>
-        {error && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-medium text-[#9b4037]">{error}</p>}
-        <button disabled={submitting} className="primary-button mt-1 w-full disabled:cursor-wait disabled:opacity-70" type="submit">
-          {submitting ? <><LoaderCircle className="animate-spin" size={17} /> Verificando...</> : <><ShieldCheck size={17} /> Entrar com segurança</>}
-        </button>
-      </form>
-      <p className="mt-5 text-center text-xs leading-relaxed text-[#8aa1a6]">A sessão expira automaticamente após 8 horas.</p>
-    </ModalShell>
-  )
-}
-
-function fileToDataUrl(file: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'))
-    reader.readAsDataURL(file)
-  })
 }
 
 async function optimizeBackgroundImage(file: File) {
@@ -519,15 +547,18 @@ async function optimizeBackgroundImage(file: File) {
 
   const optimized = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.82))
   if (!optimized) throw new Error('Não foi possível otimizar a imagem.')
-  return fileToDataUrl(optimized)
+  return optimized
 }
 
-function AdminPanel({ config, rsvps, onSave, onDeleteRsvp, onLogout, onClose }: { config: InvitationConfig; rsvps: Rsvp[]; onSave: (value: InvitationConfig) => void; onDeleteRsvp: (id: string) => void; onLogout: () => void; onClose: () => void }) {
+export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, onDeleteRsvp, onLogout, onClose }: { config: InvitationConfig; rsvps: Rsvp[]; shareUrl?: string; storageOwnerId: string; onSave: (value: InvitationConfig) => Promise<void>; onDeleteRsvp: (id: string) => Promise<void>; onLogout: () => void; onClose: () => void }) {
   const [draft, setDraft] = useState(config)
   const [tab, setTab] = useState<'content' | 'guests'>('content')
   const [saved, setSaved] = useState(false)
   const [imageError, setImageError] = useState('')
   const [imageLoading, setImageLoading] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
   const attending = rsvps.filter((rsvp) => rsvp.attendance === 'yes')
   const totalGuests = attending.reduce((total, rsvp) => total + rsvp.guests, 0)
 
@@ -536,10 +567,18 @@ function AdminPanel({ config, rsvps, onSave, onDeleteRsvp, onLogout, onClose }: 
     setSaved(false)
   }
 
-  const save = (event: FormEvent) => {
+  const save = async (event: FormEvent) => {
     event.preventDefault()
-    onSave(draft)
-    setSaved(true)
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onSave(draft)
+      setSaved(true)
+    } catch {
+      setSaveError('Não foi possível salvar. Confirme sua conexão e tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const uploadBackground = async (file: File | undefined) => {
@@ -547,7 +586,15 @@ function AdminPanel({ config, rsvps, onSave, onDeleteRsvp, onLogout, onClose }: 
     setImageLoading(true)
     setImageError('')
     try {
-      update('backgroundImage', await optimizeBackgroundImage(file))
+      const optimized = await optimizeBackgroundImage(file)
+      const path = `${storageOwnerId}/backgrounds/${crypto.randomUUID()}.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('invitation-assets')
+        .upload(path, optimized, { contentType: 'image/webp', cacheControl: '31536000' })
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('invitation-assets').getPublicUrl(path)
+      update('backgroundImage', data.publicUrl)
     } catch (error) {
       setImageError(error instanceof Error ? error.message : 'Não foi possível usar esta imagem.')
     } finally {
@@ -558,12 +605,31 @@ function AdminPanel({ config, rsvps, onSave, onDeleteRsvp, onLogout, onClose }: 
   return (
     <ModalShell onClose={onClose} side>
       <div className="flex items-start justify-between gap-4">
-        <div><p className="eyebrow text-[#178ba4]">Área administrativa</p><h2 className="mt-2 font-display text-3xl text-[#073f53]">Gerenciar convite</h2></div>
+        <div><p className="eyebrow text-[#178ba4]">Painel do responsável</p><h2 className="mt-2 font-display text-3xl text-[#073f53]">Meu convite</h2></div>
         <div className="flex items-center gap-1">
           <button onClick={onLogout} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-[#6d898f] transition hover:bg-[#fff0ed] hover:text-[#9b4037]" aria-label="Encerrar sessão administrativa"><LogOut size={15} /> Sair</button>
           <CloseButton onClick={onClose} />
         </div>
       </div>
+
+      {shareUrl && (
+        <div className="mt-6 rounded-2xl border border-[#cfe1dd] bg-[#eef8f5] p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-[#073f53]"><Share2 size={17} className="text-[#1386a5]" /> Link do convite</div>
+          <div className="mt-3 flex gap-2">
+            <input readOnly value={shareUrl} className="min-w-0 flex-1 rounded-xl border border-[#cfe1dd] bg-white px-3 py-2.5 text-xs text-[#547884] outline-none" />
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(shareUrl)
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1800)
+              }}
+              className="image-action-button px-4"
+            >{copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copiado' : 'Copiar'}</button>
+            <a href={shareUrl} target="_blank" rel="noreferrer" className="image-action-button px-3" aria-label="Abrir convite"><ExternalLink size={16} /></a>
+          </div>
+        </div>
+      )}
 
       <div className="mt-7 grid grid-cols-2 rounded-2xl bg-[#e8f3ef] p-1.5">
         <button onClick={() => setTab('content')} className={`admin-tab ${tab === 'content' ? 'admin-tab-active' : ''}`}><PencilLine size={16} /> Conteúdo</button>
@@ -663,7 +729,10 @@ function AdminPanel({ config, rsvps, onSave, onDeleteRsvp, onLogout, onClose }: 
           </AdminSection>
 
           <div className="sticky bottom-0 -mx-7 border-t border-[#d8e8e3] bg-[#fffdf7]/95 px-7 py-4 backdrop-blur sm:-mx-10 sm:px-10">
-            <button className="primary-button w-full" type="submit">{saved ? <><Check size={17} /> Alterações salvas</> : <><Sparkles size={17} /> Salvar e publicar</>}</button>
+            {saveError && <p role="alert" className="mb-3 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-medium text-[#9b4037]">{saveError}</p>}
+            <button disabled={saving} className="primary-button w-full disabled:cursor-wait disabled:opacity-70" type="submit">
+              {saving ? <><LoaderCircle className="animate-spin" size={17} /> Salvando...</> : saved ? <><Check size={17} /> Alterações salvas</> : <><Sparkles size={17} /> Salvar e publicar</>}
+            </button>
           </div>
         </form>
       ) : (
@@ -687,7 +756,7 @@ function AdminPanel({ config, rsvps, onSave, onDeleteRsvp, onLogout, onClose }: 
                     {rsvp.message && <p className="mt-2 text-sm leading-relaxed text-[#547884]">“{rsvp.message}”</p>}
                     <p className="mt-2 text-xs text-[#93a9ad]">{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(rsvp.createdAt))}</p>
                   </div>
-                  <button onClick={() => onDeleteRsvp(rsvp.id)} className="rounded-full p-2 text-[#93a9ad] transition hover:bg-[#fff0ed] hover:text-[#ba4a3d]" aria-label={`Excluir resposta de ${rsvp.name}`}><Trash2 size={16} /></button>
+                  <button onClick={() => void onDeleteRsvp(rsvp.id)} className="rounded-full p-2 text-[#93a9ad] transition hover:bg-[#fff0ed] hover:text-[#ba4a3d]" aria-label={`Excluir resposta de ${rsvp.name}`}><Trash2 size={16} /></button>
                 </div>
               </article>
             ))}

@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Theo faz 5 | Convite especial',
-  description: 'Abra o convite e venha celebrar uma aventura no fundo do mar.',
+  title: 'Convites especiais | Crie e compartilhe',
+  description: 'Crie, personalize e compartilhe um convite digital especial para sua celebração.',
 }
 
 export const viewport: Viewport = {
