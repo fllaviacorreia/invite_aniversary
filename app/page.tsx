@@ -34,6 +34,7 @@ import {
 import { supabase } from '@/lib/supabase-client'
 
 const heroImage = '/hero-ocean.png'
+const platformHeroImage = '/hero-platform-generic.png'
 
 export type InvitationConfig = {
   childName: string
@@ -401,7 +402,7 @@ export default function Page() {
 function PlatformLanding() {
   return (
     <main className="relative flex min-h-screen items-center overflow-hidden bg-[#073f53] px-6 py-16 text-white">
-      <img src={heroImage} alt="Festa infantil com tema fundo do mar" className="absolute inset-0 size-full object-cover object-center opacity-55" />
+      <img src={platformHeroImage} alt="Cartões de convite e decoração de celebração" className="absolute inset-0 size-full object-cover object-center opacity-70" />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,42,59,.96)_0%,rgba(4,42,59,.82)_48%,rgba(4,42,59,.3)_100%)]" />
       <div className="bubble bubble-one" /><div className="bubble bubble-two" /><div className="bubble bubble-three" />
       <div className="relative z-10 mx-auto w-full max-w-6xl">
