@@ -92,7 +92,10 @@ export default function PlatformAdminPage() {
             <div className="flex size-11 items-center justify-center rounded-2xl bg-white/10 text-[#ffd36a]"><Shell size={22} /></div>
             <div><p className="text-xs font-bold uppercase tracking-[.18em] text-white/55">Administração da plataforma</p><h1 className="mt-1 font-display text-2xl">Convites especiais</h1></div>
           </div>
-          <button onClick={() => void logout()} className="glass-button"><LogOut size={16} /> <span className="hidden sm:inline">Sair</span></button>
+          <div className="flex items-center gap-2">
+            <a href="/perfil" className="glass-button"><UserRound size={16} /> <span className="hidden sm:inline">Perfil</span></a>
+            <button onClick={() => void logout()} className="glass-button"><LogOut size={16} /> <span className="hidden sm:inline">Sair</span></button>
+          </div>
         </div>
       </header>
 

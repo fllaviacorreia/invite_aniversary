@@ -30,6 +30,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  UserRound,
   Users,
   Waves,
   X,
@@ -716,6 +717,7 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
       <div className="flex items-start justify-between gap-4">
         <div><p className="eyebrow text-[#178ba4]">Painel do responsável</p><h2 className="mt-2 font-display text-3xl text-[#073f53]">Meu convite</h2></div>
         <div className="flex items-center gap-1">
+          <a href="/perfil" className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-[#6d898f] transition hover:bg-[#eef8f5] hover:text-[#08738d]" aria-label="Editar meu perfil"><UserRound size={15} /> Perfil</a>
           <button onClick={onLogout} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-[#6d898f] transition hover:bg-[#fff0ed] hover:text-[#9b4037]" aria-label="Encerrar sessão administrativa"><LogOut size={15} /> Sair</button>
           <CloseButton onClick={onClose} />
         </div>
