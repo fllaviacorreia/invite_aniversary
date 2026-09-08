@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase-client'
 type OwnedInvitation = InvitationRow & {
   id: string
   owner_id: string
-  slug: string
 }
 
 type RsvpRow = {
@@ -53,7 +52,7 @@ export default function OwnerDashboardPage() {
 
       const { data: invitationData, error: invitationError } = await supabase
         .from('invitations')
-        .select('id, owner_id, slug, child_name, age, headline, introduction, event_date, event_time, venue, address, attire, attire_note, max_guests, soundtrack_url, background_image, gift_names, family_signature')
+        .select('id, owner_id, slug, child_name, age, headline, introduction, event_date, event_time, venue, address, attire, attire_note, max_guests, soundtrack_url, soundtrack_rights_confirmed, background_image, gift_names, family_signature, show_date, show_venue, show_attire, show_gifts')
         .eq('owner_id', user.id)
         .maybeSingle()
 
@@ -100,8 +99,11 @@ export default function OwnerDashboardPage() {
       .from('invitations')
       .update({ ...configToRow(nextConfig), updated_at: new Date().toISOString() })
       .eq('id', invitation.id)
-    if (updateError) throw updateError
+    if (updateError?.code === '23505') throw new Error('Este código já está sendo usado por outro convite. Escolha um código diferente.')
+    if (updateError) throw new Error('Não foi possível salvar as alterações. Tente novamente.')
+    setInvitation((current) => current ? { ...current, ...configToRow(nextConfig) } : current)
     setConfig(nextConfig)
+    setShareUrl(`${window.location.origin}/convite/${nextConfig.slug}`)
   }
 
   const deleteRsvp = async (id: string) => {

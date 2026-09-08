@@ -7,6 +7,8 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Eye,
+  EyeOff,
   ExternalLink,
   Fish,
   Gift,
@@ -20,6 +22,7 @@ import {
   Music2,
   Pause,
   PencilLine,
+  Plus,
   RotateCcw,
   Send,
   Share2,
@@ -33,10 +36,20 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase-client'
 
-const heroImage = '/hero-ocean.png'
 const platformHeroImage = '/hero-platform-generic.png'
+const supportedAudioTypes: Record<string, string> = {
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/webm': 'webm',
+}
 
 export type InvitationConfig = {
+  slug: string
   childName: string
   age: string
   headline: string
@@ -49,9 +62,14 @@ export type InvitationConfig = {
   attireNote: string
   maxGuests: number
   soundtrackUrl: string
+  soundtrackRightsConfirmed: boolean
   backgroundImage: string
   giftNames: string[]
   familySignature: string
+  showDate: boolean
+  showVenue: boolean
+  showAttire: boolean
+  showGifts: boolean
 }
 
 export type Rsvp = {
@@ -64,6 +82,7 @@ export type Rsvp = {
 }
 
 export type InvitationRow = {
+  slug: string
   child_name: string
   age: string
   headline: string
@@ -76,12 +95,18 @@ export type InvitationRow = {
   attire_note: string
   max_guests: number
   soundtrack_url: string
+  soundtrack_rights_confirmed: boolean
   background_image: string
   gift_names: string[]
   family_signature: string
+  show_date: boolean
+  show_venue: boolean
+  show_attire: boolean
+  show_gifts: boolean
 }
 
 export const defaultConfig: InvitationConfig = {
+  slug: 'convite',
   childName: 'Theo',
   age: '5',
   headline: 'mergulha em uma nova idade!',
@@ -94,9 +119,14 @@ export const defaultConfig: InvitationConfig = {
   attireNote: 'Venha com sua fantasia favorita',
   maxGuests: 4,
   soundtrackUrl: '',
-  backgroundImage: heroImage,
+  soundtrackRightsConfirmed: false,
+  backgroundImage: platformHeroImage,
   giftNames: ['Livro infantil sobre o oceano', 'Kit de pintura', 'Jogo de montar'],
   familySignature: 'Com carinho, mamãe, papai e Theo',
+  showDate: true,
+  showVenue: true,
+  showAttire: true,
+  showGifts: true,
 }
 
 const giftDetails = [
@@ -105,8 +135,18 @@ const giftDetails = [
   'Uma aventura para montar em família',
 ]
 
+function normalizeInvitationCode(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 export function rowToConfig(row: InvitationRow): InvitationConfig {
   return {
+    slug: row.slug,
     childName: row.child_name,
     age: row.age,
     headline: row.headline,
@@ -119,14 +159,20 @@ export function rowToConfig(row: InvitationRow): InvitationConfig {
     attireNote: row.attire_note,
     maxGuests: row.max_guests,
     soundtrackUrl: row.soundtrack_url,
+    soundtrackRightsConfirmed: row.soundtrack_rights_confirmed ?? false,
     backgroundImage: row.background_image,
     giftNames: row.gift_names,
     familySignature: row.family_signature,
+    showDate: row.show_date ?? true,
+    showVenue: row.show_venue ?? true,
+    showAttire: row.show_attire ?? true,
+    showGifts: row.show_gifts ?? true,
   }
 }
 
 export function configToRow(config: InvitationConfig): InvitationRow {
   return {
+    slug: config.slug,
     child_name: config.childName,
     age: config.age,
     headline: config.headline,
@@ -139,9 +185,14 @@ export function configToRow(config: InvitationConfig): InvitationRow {
     attire_note: config.attireNote,
     max_guests: config.maxGuests,
     soundtrack_url: config.soundtrackUrl,
+    soundtrack_rights_confirmed: config.soundtrackRightsConfirmed,
     background_image: config.backgroundImage,
     gift_names: config.giftNames,
     family_signature: config.familySignature,
+    show_date: config.showDate,
+    show_venue: config.showVenue,
+    show_attire: config.showAttire,
+    show_gifts: config.showGifts,
   }
 }
 
@@ -162,7 +213,7 @@ function useSupabaseInvitation(slug?: string) {
       setLoading(true)
       const baseQuery = supabase
         .from('invitations')
-        .select('id, slug, child_name, age, headline, introduction, event_date, event_time, venue, address, attire, attire_note, max_guests, soundtrack_url, background_image, gift_names, family_signature')
+        .select('id, slug, child_name, age, headline, introduction, event_date, event_time, venue, address, attire, attire_note, max_guests, soundtrack_url, soundtrack_rights_confirmed, background_image, gift_names, family_signature, show_date, show_venue, show_attire, show_gifts')
         .eq('published', true)
       const { data, error } = await baseQuery.eq('slug', slug).maybeSingle()
 
@@ -279,7 +330,8 @@ export default function Page() {
   const params = useParams<{ slug?: string }>()
   const slug = typeof params?.slug === 'string' ? params.slug : undefined
   const { config, invitationId, loading, found } = useSupabaseInvitation(slug)
-  const { isPlaying, play, toggle } = useSoundtrack(config.soundtrackUrl)
+  const soundtrackSource = config.soundtrackRightsConfirmed ? config.soundtrackUrl : ''
+  const { isPlaying, play, toggle } = useSoundtrack(soundtrackSource)
   const [entered, setEntered] = useState(false)
   const [rsvpOpen, setRsvpOpen] = useState(false)
   const [reserved, setReserved] = useState<string[]>([])
@@ -304,6 +356,8 @@ export default function Page() {
   if (!slug) return <PlatformLanding />
   if (loading) return <InvitationMessage loading text="Preparando o convite..." />
   if (!found) return <InvitationMessage text="Este convite não existe ou ainda não está publicado." />
+  const visibleInfoCount = Number(config.showDate) + Number(config.showVenue) + Number(config.showAttire)
+  const infoGridClass = visibleInfoCount === 1 ? 'mx-auto max-w-md sm:grid-cols-1' : visibleInfoCount === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#edf7f3] text-[#123f4d]">
@@ -322,7 +376,7 @@ export default function Page() {
       </nav>
 
       <section id="inicio" className="hero-section">
-        <img src={config.backgroundImage || heroImage} alt={`${config.childName} em um cenário de fundo do mar`} className="absolute inset-0 size-full object-cover object-center" />
+        <img src={config.backgroundImage || platformHeroImage} alt={`Imagem de capa do convite de ${config.childName}`} className="absolute inset-0 size-full object-cover object-center" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,45,65,.42)_0%,rgba(5,45,65,.04)_42%,rgba(5,45,65,.88)_100%)]" />
         <div className="absolute bottom-0 left-0 right-0 h-28 bg-linear-to-t from-[#edf7f3] to-transparent" />
         <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-20 sm:pb-24">
@@ -342,19 +396,19 @@ export default function Page() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-6xl px-6 py-16 sm:py-24">
+      {visibleInfoCount > 0 && <section className="relative mx-auto max-w-6xl px-6 py-16 sm:py-24">
         <div className="mx-auto max-w-2xl text-center">
           <p className="eyebrow text-[#178ba4]">Anote na concha</p>
           <h2 className="section-title mt-3">Um dia especial merece uma festa <i>inesquecível</i></h2>
         </div>
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          <InfoCard icon={<CalendarDays />} title="Quando" text={config.date} sub={config.time} />
-          <InfoCard icon={<MapPin />} title="Onde" text={config.venue} sub={config.address} />
-          <InfoCard icon={<Fish />} title="Traje" text={config.attire} sub={config.attireNote} />
+        <div className={`mt-10 grid gap-4 ${infoGridClass}`}>
+          {config.showDate && <InfoCard icon={<CalendarDays />} title="Quando" text={config.date} sub={config.time} />}
+          {config.showVenue && <InfoCard icon={<MapPin />} title="Onde" text={config.venue} sub={config.address} />}
+          {config.showAttire && <InfoCard icon={<Fish />} title="Traje" text={config.attire} sub={config.attireNote} />}
         </div>
-      </section>
+      </section>}
 
-      <section className="bg-[#073f53] px-6 py-16 text-[#fffdf7] sm:py-24">
+      {config.showGifts && config.giftNames.some((gift) => gift.trim()) && <section className="bg-[#073f53] px-6 py-16 text-[#fffdf7] sm:py-24">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
           <div>
             <p className="eyebrow text-[#ffd36a]">Um mimo para o aniversariante</p>
@@ -383,7 +437,7 @@ export default function Page() {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       <footer className="bg-[#edf7f3] px-6 py-14 text-center">
         <Shell className="mx-auto mb-4 text-[#1386a5]" size={28} />
@@ -441,7 +495,7 @@ function InvitationMessage({ text, loading = false }: { text: string; loading?: 
 function AccessCover({ config, onEnter }: { config: InvitationConfig; onEnter: () => void }) {
   return (
     <section className="access-cover" aria-label="Abertura do convite">
-      <img src={config.backgroundImage || heroImage} alt="" className="absolute inset-0 size-full object-cover object-center" />
+      <img src={config.backgroundImage || platformHeroImage} alt="" className="absolute inset-0 size-full object-cover object-center" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,42,59,.32),rgba(4,42,59,.86))]" />
       <div className="bubble bubble-one" /><div className="bubble bubble-two" /><div className="bubble bubble-three" />
       <div className="relative z-10 mx-auto w-full max-w-md px-6 text-center text-white">
@@ -557,6 +611,8 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
   const [saved, setSaved] = useState(false)
   const [imageError, setImageError] = useState('')
   const [imageLoading, setImageLoading] = useState(false)
+  const [audioError, setAudioError] = useState('')
+  const [audioLoading, setAudioLoading] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -568,15 +624,37 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
     setSaved(false)
   }
 
+  const updateSoundtrack = (url: string) => {
+    setDraft((current) => ({ ...current, soundtrackUrl: url, soundtrackRightsConfirmed: false }))
+    setAudioError('')
+    setSaved(false)
+  }
+
   const save = async (event: FormEvent) => {
     event.preventDefault()
+    const normalizedSlug = normalizeInvitationCode(draft.slug)
+    if (normalizedSlug.length < 3) {
+      setSaveError('O código do convite precisa ter pelo menos 3 caracteres.')
+      return
+    }
+    if (draft.soundtrackUrl.trim() && !draft.soundtrackRightsConfirmed) {
+      setSaveError('Confirme que você possui autorização para usar a música escolhida.')
+      return
+    }
+
     setSaving(true)
     setSaveError('')
     try {
-      await onSave(draft)
+      const preparedDraft = {
+        ...draft,
+        slug: normalizedSlug,
+        giftNames: draft.giftNames.map((gift) => gift.trim()).filter(Boolean),
+      }
+      await onSave(preparedDraft)
+      setDraft(preparedDraft)
       setSaved(true)
-    } catch {
-      setSaveError('Não foi possível salvar. Confirme sua conexão e tente novamente.')
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar. Confirme sua conexão e tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -600,6 +678,36 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
       setImageError(error instanceof Error ? error.message : 'Não foi possível usar esta imagem.')
     } finally {
       setImageLoading(false)
+    }
+  }
+
+  const uploadSoundtrack = async (file: File | undefined) => {
+    if (!file) return
+    const extension = supportedAudioTypes[file.type]
+    if (!extension) {
+      setAudioError('Use um arquivo MP3, M4A, OGG, WAV ou WebM.')
+      return
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setAudioError('O áudio deve ter no máximo 20 MB.')
+      return
+    }
+
+    setAudioLoading(true)
+    setAudioError('')
+    try {
+      const path = `${storageOwnerId}/soundtracks/${crypto.randomUUID()}.${extension}`
+      const { error: uploadError } = await supabase.storage
+        .from('invitation-audio')
+        .upload(path, file, { contentType: file.type, cacheControl: '31536000' })
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('invitation-audio').getPublicUrl(path)
+      updateSoundtrack(data.publicUrl)
+    } catch {
+      setAudioError('Não foi possível enviar o áudio. Verifique o arquivo e tente novamente.')
+    } finally {
+      setAudioLoading(false)
     }
   }
 
@@ -639,6 +747,24 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
 
       {tab === 'content' ? (
         <form onSubmit={save} className="mt-8 flex flex-col gap-7">
+          <AdminSection title="Link do convite">
+            <AdminField label="Código único">
+              <div className="flex items-center overflow-hidden rounded-xl border border-[#cfe1dd] bg-white focus-within:border-[#1386a5] focus-within:ring-2 focus-within:ring-[#1386a5]/15">
+                <span className="shrink-0 border-r border-[#d8e8e3] bg-[#f3f8f6] px-3 py-3 text-xs text-[#79949c]">/convite/</span>
+                <input
+                  value={draft.slug}
+                  onChange={(event) => update('slug', normalizeInvitationCode(event.target.value))}
+                  minLength={3}
+                  maxLength={80}
+                  required
+                  spellCheck={false}
+                  className="min-w-0 flex-1 bg-transparent px-3 py-3 font-normal text-[#073f53] outline-none"
+                />
+              </div>
+              <span className="field-hint">Use letras, números e hífens. O código deve ser único; ao alterá-lo, o link anterior deixa de funcionar.</span>
+            </AdminField>
+          </AdminSection>
+
           <AdminSection title="Aniversariante">
             <div className="grid gap-4 sm:grid-cols-[1fr_100px]">
               <AdminField label="Nome"><input value={draft.childName} onChange={(event) => update('childName', event.target.value)} className="field-input" /></AdminField>
@@ -650,7 +776,7 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
 
           <AdminSection title="Imagem de fundo">
             <div className="relative aspect-16/10 overflow-hidden rounded-2xl bg-[#d8eeea]">
-              <img src={draft.backgroundImage || heroImage} alt="Prévia da imagem de fundo" className="size-full object-cover" />
+              <img src={draft.backgroundImage || platformHeroImage} alt="Prévia da imagem de fundo" className="size-full object-cover" />
               <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-linear-to-t from-[#052f40]/75 to-transparent px-4 pb-3 pt-8 text-xs font-bold text-white"><ImageIcon size={15} /> Prévia da capa</div>
             </div>
             <AdminField label="Usar uma imagem da internet">
@@ -684,18 +810,20 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
                 type="button"
                 onClick={() => {
                   setImageError('')
-                  update('backgroundImage', heroImage)
+                  update('backgroundImage', platformHeroImage)
                 }}
                 className="image-action-button"
-              ><RotateCcw size={17} /> Restaurar original</button>
+              ><RotateCcw size={17} /> Usar imagem padrão</button>
             </div>
             {imageError && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-medium text-[#9b4037]">{imageError}</p>}
             <p className="field-hint">Formatos JPG, PNG ou WebP, com até 10 MB. O arquivo é otimizado automaticamente.</p>
           </AdminSection>
 
           <AdminSection title="Data e local">
+            <VisibilityControl visible={draft.showDate} onChange={(visible) => update('showDate', visible)} label="Exibir data e horário" />
             <AdminField label="Data"><input value={draft.date} onChange={(event) => update('date', event.target.value)} className="field-input" /></AdminField>
             <AdminField label="Horário"><input value={draft.time} onChange={(event) => update('time', event.target.value)} className="field-input" /></AdminField>
+            <VisibilityControl visible={draft.showVenue} onChange={(visible) => update('showVenue', visible)} label="Exibir local e endereço" />
             <AdminField label="Nome do local"><input value={draft.venue} onChange={(event) => update('venue', event.target.value)} className="field-input" /></AdminField>
             <AdminField label="Endereço"><input value={draft.address} onChange={(event) => update('address', event.target.value)} className="field-input" /></AdminField>
           </AdminSection>
@@ -709,21 +837,51 @@ export function AdminPanel({ config, rsvps, shareUrl, storageOwnerId, onSave, on
           </AdminSection>
 
           <AdminSection title="Trilha sonora">
-            <AdminField label="Link direto do áudio (opcional)">
-              <input type="url" value={draft.soundtrackUrl} onChange={(event) => update('soundtrackUrl', event.target.value)} placeholder="https://site.com/musica.mp3" className="field-input" />
+            <AdminField label="Link direto do áudio">
+              <input type="url" value={draft.soundtrackUrl} onChange={(event) => updateSoundtrack(event.target.value)} placeholder="https://site.com/musica.mp3" className="field-input" />
             </AdminField>
-            <p className="admin-note"><Music2 size={17} /> Sem um link, o convite usa a trilha instrumental suave que já vem incluída.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="image-action-button">
+                {audioLoading ? <LoaderCircle className="animate-spin" size={17} /> : <Upload size={17} />}
+                {audioLoading ? 'Enviando...' : 'Enviar áudio'}
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/wav,audio/x-wav,audio/webm"
+                  disabled={audioLoading}
+                  className="sr-only"
+                  onChange={(event) => {
+                    void uploadSoundtrack(event.target.files?.[0])
+                    event.currentTarget.value = ''
+                  }}
+                />
+              </label>
+              <button type="button" disabled={!draft.soundtrackUrl || audioLoading} onClick={() => updateSoundtrack('')} className="image-action-button disabled:cursor-not-allowed disabled:opacity-50"><Trash2 size={17} /> Remover música</button>
+            </div>
+            {draft.soundtrackUrl.trim() && <audio key={draft.soundtrackUrl} controls preload="metadata" src={draft.soundtrackUrl} className="w-full" aria-label="Prévia da trilha sonora" />}
+            {audioError && <p role="alert" className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm font-medium text-[#9b4037]">{audioError}</p>}
+            {draft.soundtrackUrl.trim() && <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#d8e8e3] bg-[#f3f8f6] p-4 text-xs leading-relaxed text-[#547884]">
+              <input type="checkbox" checked={draft.soundtrackRightsConfirmed} onChange={(event) => update('soundtrackRightsConfirmed', event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-[#1386a5]" />
+              <span>Declaro que possuo autorização ou licença para utilizar esta música no convite.</span>
+            </label>}
+            <p className="admin-note"><Music2 size={17} /> Cole um link direto ou envie MP3, M4A, OGG, WAV ou WebM de até 20 MB. Sem uma música personalizada, o convite usa a trilha instrumental padrão.</p>
           </AdminSection>
 
           <AdminSection title="Sugestões de presentes">
+            <VisibilityControl visible={draft.showGifts} onChange={(visible) => update('showGifts', visible)} label="Exibir sugestões no convite" />
             {draft.giftNames.map((gift, index) => (
-              <AdminField key={index} label={`Sugestão ${index + 1}`}>
-                <input value={gift} onChange={(event) => update('giftNames', draft.giftNames.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} className="field-input" />
-              </AdminField>
+              <div key={index} className="flex items-end gap-2">
+                <div className="min-w-0 flex-1"><AdminField label={`Sugestão ${index + 1}`}>
+                  <input value={gift} onChange={(event) => update('giftNames', draft.giftNames.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} maxLength={120} className="field-input" />
+                </AdminField></div>
+                <button type="button" onClick={() => update('giftNames', draft.giftNames.filter((_, itemIndex) => itemIndex !== index))} className="mb-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#e8cbc5] text-[#a55549] transition hover:bg-[#fff0ed]" aria-label={`Remover sugestão ${index + 1}`}><Trash2 size={17} /></button>
+              </div>
             ))}
+            {draft.giftNames.length === 0 && <p className="rounded-2xl border border-dashed border-[#b8d5d1] px-4 py-6 text-center text-sm text-[#79949c]">Nenhuma sugestão adicionada.</p>}
+            <button type="button" disabled={draft.giftNames.length >= 20} onClick={() => update('giftNames', [...draft.giftNames, ''])} className="image-action-button disabled:cursor-not-allowed disabled:opacity-50"><Plus size={17} /> Adicionar sugestão</button>
           </AdminSection>
 
           <AdminSection title="Detalhes finais">
+            <VisibilityControl visible={draft.showAttire} onChange={(visible) => update('showAttire', visible)} label="Exibir traje sugerido" />
             <AdminField label="Traje"><input value={draft.attire} onChange={(event) => update('attire', event.target.value)} className="field-input" /></AdminField>
             <AdminField label="Observação sobre o traje"><input value={draft.attireNote} onChange={(event) => update('attireNote', event.target.value)} className="field-input" /></AdminField>
             <AdminField label="Assinatura"><input value={draft.familySignature} onChange={(event) => update('familySignature', event.target.value)} className="field-input" /></AdminField>
@@ -796,6 +954,17 @@ function AdminSection({ title, children }: { title: string; children: ReactNode 
 
 function AdminField({ label, children }: { label: string; children: ReactNode }) {
   return <label className="field-label">{label}{children}</label>
+}
+
+function VisibilityControl({ visible, onChange, label }: { visible: boolean; onChange: (visible: boolean) => void; label: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-[#d8e8e3] bg-[#f3f8f6] px-4 py-3">
+      <div><p className="text-sm font-semibold text-[#315f69]">{label}</p><p className="mt-0.5 text-xs text-[#79949c]">{visible ? 'Visível para os convidados' : 'Oculto no convite'}</p></div>
+      <button type="button" onClick={() => onChange(!visible)} aria-pressed={visible} className={`flex size-10 shrink-0 items-center justify-center rounded-full border transition ${visible ? 'border-[#8fc9bd] bg-[#dff1ed] text-[#0a7088]' : 'border-[#d8e0de] bg-white text-[#93a9ad]'}`} aria-label={`${visible ? 'Ocultar' : 'Exibir'} ${label.toLowerCase()}`}>
+        {visible ? <Eye size={18} /> : <EyeOff size={18} />}
+      </button>
+    </div>
+  )
 }
 
 function StatCard({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
